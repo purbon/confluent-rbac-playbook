@@ -21,7 +21,8 @@ SUPER_USER_PRINCIPAL="User:$SUPER_USER"
 CONNECT_PRINCIPAL="User:fry"
 C3_PRINCIPAL="User:hermes"
 SR_PRINCIPAL="User:leela"
-#KAFKA_CLUSTER_ID="x64IAgb0TfOs-3-YoGB4gA"
+OTHER_PRINCIPAL="User:zoidberg"
+
 CONNECT=connect-cluster
 SR=schema-registry
 C3=c3-cluster
@@ -103,6 +104,13 @@ confluent iam rolebinding create \
     --role SystemAdmin \
     --kafka-cluster-id $KAFKA_CLUSTER_ID
 
+################################### OTHER ROLE ###################################
+
+confluent iam rolebinding create \
+    --principal $OTHER_PRINCIPAL \
+    --role DeveloperWrite \
+    --resource "Topic:connect-configs" \
+    --kafka-cluster-id $KAFKA_CLUSTER_ID
 
 
 echo "Finished setting up role bindings"
@@ -113,4 +121,5 @@ echo
 echo "    super user account: $SUPER_USER_PRINCIPAL"
 echo "    connect service account: $CONNECT_PRINCIPAL"
 echo "    schema registry service account: $SR_PRINCIPAL"
-echo "    C3 service account: $C3_PRINCIPAL"    
+echo "    C3 service account: $C3_PRINCIPAL"
+echo "    Other service account: $OTHER_PRINCIPAL"
