@@ -157,6 +157,46 @@ services:
       # CONFLUENT_METRICS_ENABLE: 'true'
       # CONFLUENT_SUPPORT_CUSTOMER_ID: 'anonymous'
 
+  schema-registry:
+    image: confluentinc/cp-schema-registry:5.4.0
+    hostname: schema-registry
+    container_name: schema-registry
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./conf:/tmp/conf
+    environment:
+      CUB_CLASSPATH: '/etc/confluent/docker/docker-utils.jar:/usr/share/java/confluent-security/schema-registry/*:/usr/share/java/schema-registry/*'
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      # This is only needed if you don't have a license and would like to test as part of a trial period
+      SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: zookeeper:2181
+
+      # configure how to connect to kafka for SR to store its internal info
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: broker:9092
+      SCHEMA_REGISTRY_KAFKASTORE_SECURITY_PROTOCOL: SASL_PLAINTEXT
+      SCHEMA_REGISTRY_KAFKASTORE_SASL_MECHANISM: OAUTHBEARER
+      SCHEMA_REGISTRY_KAFKASTORE_SASL_LOGIN_CALLBACK_HANDLER_CLASS: io.confluent.kafka.clients.plugins.auth.token.TokenUserLoginCallbackHandler
+      SCHEMA_REGISTRY_KAFKASTORE_SASL_JAAS_CONFIG: |
+                                                    \
+                                                    org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required \
+                                                    username="leela" \
+                                                    password="leela" \
+                                                    metadataServerUrls="http://broker:8090";
+      SCHEMA_REGISTRY_KAFKASTORE_TOPIC: _schemas
+      SCHEMA_REGISTRY_DEBUG: 'true'
+
+      # ======================= RBAC =================================
+      SCHEMA_REGISTRY_SCHEMA_REGISTRY_RESOURCE_EXTENSION_CLASS: io.confluent.kafka.schemaregistry.security.SchemaRegistrySecurityResourceExtension
+      SCHEMA_REGISTRY_CONFLUENT_SCHEMA_REGISTRY_AUTHORIZER_CLASS: io.confluent.kafka.schemaregistry.security.authorizer.rbac.RbacAuthorizer
+      SCHEMA_REGISTRY_REST_SERVLET_INITIALIZOR_CLASSES: io.confluent.common.security.jetty.initializer.InstallBearerOrBasicSecurityHandler
+      # how to connect to MDS
+      SCHEMA_REGISTRY_CONFLUENT_METADATA_BOOTSTRAP_SERVER_URLS: http://broker:8090
+      SCHEMA_REGISTRY_CONFLUENT_METADATA_HTTP_AUTH_CREDENTIALS_PROVIDER: BASIC
+      SCHEMA_REGISTRY_CONFLUENT_METADATA_BASIC_AUTH_USER_INFO: leela:leela
+      # public key to verify tokens during authentication
+      SCHEMA_REGISTRY_PUBLIC_KEY_PATH: /tmp/conf/public.pem
+
   connect:
     image: confluentinc/cp-server-connect:5.4.0
     hostname: connect
@@ -262,11 +302,6 @@ services:
       - "9021:9021"
     volumes:
       - ./conf:/tmp/conf
-    healthcheck:
-        test: nc -z localhost 9021
-        interval: 3s
-        retries: 15
-        start_period: 30s
     environment:
       # CUB CLASSPATH
       CUB_CLASSPATH: '/etc/confluent/docker/docker-utils.jar:/usr/share/java/confluent-control-center/*:/usr/share/java/rest-utils/*:/usr/share/java/confluent-common/*'
@@ -274,22 +309,24 @@ services:
       # general settings
       CONTROL_CENTER_BOOTSTRAP_SERVERS: 'broker:9092'
       CONTROL_CENTER_ZOOKEEPER_CONNECT: 'zookeeper:2181'
-      CONTROL_CENTER_CONNECT_CLUSTER: 'http://connect:8083'
-      #CONTROL_CENTER_KSQL_URL: "http://ksql-server:8088"
-      #CONTROL_CENTER_KSQL_ADVERTISED_URL: "http://localhost:8088"
-      #CONTROL_CENTER_SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
       CONTROL_CENTER_REPLICATION_FACTOR: 1
       CONTROL_CENTER_INTERNAL_TOPICS_PARTITIONS: 1
       CONTROL_CENTER_MONITORING_INTERCEPTOR_TOPIC_PARTITIONS: 1
       CONFLUENT_METRICS_TOPIC_REPLICATION: 1
       PORT: 9021
+
+      # ========================= other services ==============================
+      # connect
+      CONTROL_CENTER_CONNECT_CONNECT1_CLUSTER: http://connect:8083
+      # schema-registry
+      CONTROL_CENTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+
       # ========================= RBAC =================================
       CONTROL_CENTER_REST_AUTHENTICATION_METHOD: BEARER
-      CONTROL_CENTER_AUTH_BEARER_PUBLIC_KEY_PATH: /tmp/conf/public.pem
+      PUBLIC_KEY_PATH: /tmp/conf/public.pem
 
-      CONTROL_CENTER_METADATA_USERNAME: hermes
-      CONTROL_CENTER_METADATA_PASSWORD: hermes
-      CONTROL_CENTER_METADATA_URLS: http://broker:8090
+      CONFLUENT_METADATA_BASIC_AUTH_USER_INFO: hermes:hermes
+      CONFLUENT_METADATA_BOOTSTRAP_SERVER_URLS: http://broker:8090
 
       CONTROL_CENTER_STREAMS_SECURITY_PROTOCOL: SASL_PLAINTEXT
       # The following configs are not required by C3 itself, but are required by cub to be able to connect to kafka to check if its ready
