@@ -21,7 +21,7 @@ services:
     privileged: true
 
   zookeeper:
-    image: confluentinc/cp-zookeeper:5.3.0
+    image: confluentinc/cp-zookeeper:5.4.0
     hostname: zookeeper
     container_name: zookeeper
     ports:
@@ -31,7 +31,7 @@ services:
       ZOOKEEPER_TICK_TIME: 2000
 
   broker:
-    image: confluentinc/cp-server:5.3.0
+    image: confluentinc/cp-server:5.4.0
     hostname: broker
     container_name: broker
     depends_on:
@@ -49,10 +49,12 @@ services:
       KAFKA_SUPER_USERS: User:admin;User:mds;User:professor
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_CONFLUENT_LICENSE_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CONFLUENT_SCHEMA_REGISTRY_URL: http://schema-registry:8081
       KAFKA_ADVERTISED_LISTENERS: INTERNAL://localhost:9093,EXTERNAL://broker:9092,OUTSIDE://localhost:9094
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:SASL_PLAINTEXT,EXTERNAL:SASL_PLAINTEXT,OUTSIDE:SASL_PLAINTEXT
       KAFKA_CONFLUENT_METADATA_SECURITY_PROTOCOL: SASL_PLAINTEXT
-      # Configure interbroker listener
+       # Configure interbroker listener
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: PLAIN
       KAFKA_LISTENER_NAME_INTERNAL_SASL_ENABLED_MECHANISMS: PLAIN
@@ -99,7 +101,7 @@ services:
       KAFKA_CONFLUENT_METADATA_TOPIC_REPLICATION_FACTOR: 1
 
       # Configure MDS listener and http server
-      KAFKA_CONFLUENT_METADATA_SERVER_AUTHENTICATION_METHOD: BASIC
+      KAFKA_CONFLUENT_METADATA_SERVER_AUTHENTICATION_METHOD: BEARER
       KAFKA_CONFLUENT_METADATA_SERVER_AUTHENTICATION_ROLES: '**'
       KAFKA_CONFLUENT_METADATA_SERVER_LISTENERS: http://0.0.0.0:8090
       KAFKA_CONFLUENT_METADATA_SERVER_ADVERTISED_LISTENERS: http://broker:8090
@@ -113,7 +115,7 @@ services:
 
       # Configure RBAC authorizer
       # KAFKA_CONFLUENT_AUTHORIZER_SCOPE: myCluster
-      KAFKA_CONFLUENT_AUTHORIZER_ACCESS_RULE_PROVIDERS: RBAC
+      KAFKA_CONFLUENT_AUTHORIZER_ACCESS_RULE_PROVIDERS: CONFLUENT,ZK_ACL
       # KAFKA_CONFLUENT_AUTHORIZER_METADATA_PROVIDER: RBAC
       KAFKA_CONFLUENT_AUTHORIZER_GROUP_PROVIDER: RBAC
       # KAFKA_CONFLUENT_METADATA_SERVER_SCOPE: ''
@@ -134,11 +136,29 @@ services:
       KAFKA_LDAP_USER_MEMBEROF_ATTRIBUTE: ou
       KAFKA_LDAP_GROUP_NAME_ATTRIBUTE: cn
       KAFKA_LDAP_GROUP_OBJECT_CLASS: group
+
+      # ======================= CONFIGURE METRICS REPORTER =========================
+      KAFKA_METRIC_REPORTERS: io.confluent.metrics.reporter.ConfluentMetricsReporter
+      CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
+
+      # point at our 'INTERNAL' listener
+      CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: broker:9093
+      # CONFLUENT_METRICS_REPORTER_ZOOKEEPER_CONNECT: zookeeper:2181
+      CONFLUENT_METRICS_REPORTER_SECURITY_PROTOCOL: SASL_PLAINTEXT
+      CONFLUENT_METRICS_REPORTER_SASL_MECHANISM: PLAIN
+      CONFLUENT_METRICS_REPORTER_SASL_JAAS_CONFIG: |
+                                                    \
+                                                    org.apache.kafka.common.security.plain.PlainLoginModule required \
+                                                    username="admin" \
+                                                    password="admin-secret";
       # ======================= OTHER BROKER STUFF =================================
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      # KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      # CONFLUENT_METRICS_ENABLE: 'true'
+      # CONFLUENT_SUPPORT_CUSTOMER_ID: 'anonymous'
 
   connect:
-    image: confluentinc/cp-server-connect:5.3.0
+    image: confluentinc/cp-server-connect:5.4.0
     hostname: connect
     container_name: connect
     depends_on:
@@ -231,7 +251,7 @@ services:
                                                                           metadataServerUrls="http://broker:8090";
 
   control-center:
-    image: confluentinc/cp-enterprise-control-center:5.3.0
+    image: confluentinc/cp-enterprise-control-center:5.4.0
     hostname: control-center
     container_name: control-center
     depends_on:
